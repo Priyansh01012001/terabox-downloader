@@ -5,129 +5,163 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quick Player Instant Streaming</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #0f172a;
-            color: #ffffff;
+        * {
+            box-sizing: border-box;
             margin: 0;
-            padding: 20px;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #0b1120;
+            color: #ffffff;
             display: flex;
             flex-direction: column;
             align-items: center;
+            justify-content: flex-start;
             min-height: 100vh;
+            padding: 20px;
         }
         .container {
             width: 100%;
-            max-width: 450px;
-            background: #1e293b;
-            padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            max-width: 650px;
             text-align: center;
-            margin-top: 20px;
+            margin-top: 40px;
         }
-        h2 { color: #38bdf8; margin-bottom: 8px; }
-        p { color: #94a3b8; font-size: 14px; margin-bottom: 20px; }
+        h1 {
+            color: #38bdf8;
+            font-size: 26px;
+            margin-bottom: 8px;
+        }
+        p {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 25px;
+        }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
         input[type="text"] {
             width: 100%;
-            padding: 12px;
+            padding: 14px 16px;
+            background-color: #1e293b;
             border: 1px solid #334155;
-            background: #0f172a;
-            color: #fff;
             border-radius: 8px;
-            font-size: 14px;
-            box-sizing: border-box;
-            margin-bottom: 15px;
+            color: #fff;
+            font-size: 15px;
             outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus {
+            border-color: #38bdf8;
         }
         button {
             width: 100%;
-            padding: 12px;
+            padding: 14px;
             background-color: #2563eb;
             color: white;
             border: none;
             border-radius: 8px;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
+            transition: background-color 0.2s;
         }
-        .result-box {
-            margin-top: 20px;
-            display: none;
-            text-align: left;
+        button:hover {
+            background-color: #1d4ed8;
         }
-        video {
+        #fileName {
+            color: #38bdf8;
+            font-size: 15px;
+            margin: 15px 0 10px 0;
+            font-weight: 500;
+            word-break: break-all;
+        }
+        .player-box {
             width: 100%;
-            height: 250px;
-            border-radius: 8px;
+            margin-top: 15px;
+            background: #1e293b;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #334155;
+            display: none;
+        }
+        iframe {
+            width: 100%;
+            height: 380px;
             border: none;
-            margin-top: 10px;
             background: #000;
         }
-        .download-btn {
-            display: block;
-            width: 100%;
-            padding: 12px;
-            background-color: #16a34a;
-            color: white;
-            text-align: center;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: bold;
+        .error-msg {
+            color: #f87171;
             margin-top: 15px;
-            box-sizing: border-box;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>Quick Player Instant Streaming</h2>
-        <p>Watch your Terabox links instantly and faster.</p>
-        
-        <input type="text" id="teraboxUrl" placeholder="Paste your Terabox link here...">
-        <button onclick="extractVideo()">▶ Play Video</button>
+        <h1>Quick Player Instant Streaming</h1>
+        <p>Watch your Terabox links instantly and faster inside your website.</p>
 
-        <div class="result-box" id="resultBox">
-            <h3 id="fileName" style="font-size: 15px; color: #38bdf8;"></h3>
-            <div id="playerContainer"></div>
-            <a id="downloadLinkBtn" href="#" class="download-btn" target="_blank">📥 Download Video File</a>
+        <div class="input-group">
+            <input type="text" id="urlInput" placeholder="Paste Terabox link here (e.g., https://1024terabox.com/s/...)">
+            <button id="extractBtn" onclick="extractVideo()">▶ Play Video</button>
+        </div>
+
+        <div id="errorBox" class="error-msg"></div>
+        <div id="fileName"></div>
+
+        <div class="player-box" id="playerBox">
+            <iframe id="videoIframe" src="" allowfullscreen></iframe>
         </div>
     </div>
 
     <script>
         async function extractVideo() {
-            let url = document.getElementById('teraboxUrl').value;
-            if(!url) {
-                alert("Pehle Terabox ka link toh daal bhai!");
+            const url = document.getElementById('urlInput').value.trim();
+            const errorBox = document.getElementById('errorBox');
+            const fileNameDiv = document.getElementById('fileName');
+            const playerBox = document.getElementById('playerBox');
+            const videoIframe = document.getElementById('videoIframe');
+            const btn = document.getElementById('extractBtn');
+
+            errorBox.innerText = '';
+            fileNameDiv.innerText = '';
+            videoIframe.src = '';
+            playerBox.style.display = 'none';
+
+            if (!url) {
+                errorBox.innerText = 'Pehle Terabox ka link paste karo bhai!';
                 return;
             }
 
-            let btn = document.querySelector('button');
-            btn.innerText = "Extracting Stream...";
+            btn.innerText = 'Processing...';
             btn.disabled = true;
 
             try {
-                let response = await fetch('/api/extract', {
+                const response = await fetch('/api/extract', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url: url })
                 });
 
-                let data = await response.json();
-                
-                if(data.success) {
-                    document.getElementById('resultBox').style.display = 'block';
-                    document.getElementById('fileName').innerText = data.fileName;
-                    document.getElementById('playerContainer').innerHTML = `<video controls autoplay src="${data.downloadUrl}"></video>`;
-                    document.getElementById('downloadLinkBtn').href = data.downloadUrl;
+                const data = await response.json();
+
+                if (data.success) {
+                    fileNameDiv.innerText = data.fileName;
+                    videoIframe.src = data.downloadUrl;
+                    playerBox.style.display = 'block';
                 } else {
-                    alert("Error: " + (data.error || "Extraction failed"));
+                    errorBox.innerText = data.error || 'Kuch gadbad ho gayi!';
                 }
             } catch (err) {
-                alert("Server issue! Please try again.");
+                errorBox.innerText = 'Server error! Dobara try karo.';
             } finally {
-                btn.innerText = "▶ Play Video";
+                btn.innerText = '▶ Play Video';
                 btn.disabled = false;
             }
         }
