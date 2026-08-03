@@ -18,7 +18,6 @@ app.post('/api/extract', (req, res) => {
             return res.status(400).json({ success: false, error: 'Link toh daal bhai!' });
         }
 
-        // Direct url return karenge bina kisi external dependency ke
         return res.json({
             success: true,
             fileName: "Terabox_Video.mp4",
@@ -30,6 +29,11 @@ app.post('/api/extract', (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+// Vercel serverless compatibility ke liye export zaroori hai
+module.exports = app;
+
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Server is running on port ${PORT}`);
+    });
+}
