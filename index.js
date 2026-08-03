@@ -1,5 +1,4 @@
 const express = require('express');
-const axios = require('axios');
 const path = require('path');
 
 const app = express();
@@ -12,44 +11,30 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+// Server block bypass fallback route
 app.post('/api/extract', async (req, res) => {
-    try {
-        const { url } = req.body;
-        if (!url) {
-            return res.status(400).json({ success: false, error: 'Link paste karo bhai!' });
-        }
-
-        // Teri screenshots wali exact cookies yahan embedded hain
-        const cookieString = "ndus=YVOf2LVpeHuiTMati6UbujR3LJg821yBfes9B0ly; browserid=FC7WNxpU5oKPLaTFHiWcLAtSxujvwsU1Q0rvLIW4fZSu7W83eUCO6qBZiZY=; csrfToken=ODkMtlKj_BGuE6KzW_6ho8FZ";
-        const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
-        // Terabox official web bypass worker endpoint
-        const apiResponse = await axios.get(`https://terabox-dl-api.oto.workers.dev/?url=${encodeURIComponent(url)}`, {
-            headers: {
-                'Cookie': cookieString,
-                'User-Agent': userAgent,
-                'Referer': 'https://www.terabox.com/'
-            },
-            timeout: 12000
-        });
-
-        if (apiResponse.data && (apiResponse.data.url || apiResponse.data.downloadLink || apiResponse.data.direct_link)) {
-            const downloadUrl = apiResponse.data.url || apiResponse.data.downloadLink || apiResponse.data.direct_link;
-            const fileName = apiResponse.data.filename || "Terabox_Video.mp4";
-
-            return res.json({
-                success: true,
-                fileName: fileName,
-                downloadUrl: downloadUrl
-            });
-        }
-
-        return res.status(400).json({ success: false, error: 'Link extract nahi ho paya. Dobara try karo.' });
-
-    } catch (error) {
-        console.error("Extraction error:", error.message);
-        return res.status(500).json({ success: false, error: 'Server error! Terabox block kar raha hai.' });
+    const { url } = req.body;
+    if (!url) {
+        return res.status(400).json({ success: false, error: 'Link paste karo bhai!' });
     }
+
+    let match = url.match(/\/s\/1([a-zA-Z0-9_-]+)/) || url.match(/surl=1([a-zA-Z0-9_-]+)/);
+    let shortUrl = match ? "1" + match[1] : "";
+    if (!shortUrl) {
+        const parts = url.split('/');
+        shortUrl = parts[parts.length - 1];
+    }
+
+    // Direct embed/stream link generation
+    if (shortUrl) {
+        return res.json({
+            success: true,
+            fileName: "Terabox_Stream.mp4",
+            downloadUrl: `https://www.1024terabox.com/sharing/embed?surl=${shortUrl}&autoplay=1`
+        });
+    }
+
+    return res.status(400).json({ success: false, error: 'Invalid link' });
 });
 
 module.exports = app;
