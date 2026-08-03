@@ -18,19 +18,38 @@ app.post('/api/extract', async (req, res) => {
     try {
         const { url } = req.body;
         if (!url) {
-            return res.status(400).json({ error: 'Please provide a Terabox link!' });
+            return res.status(400).json({ success: false, error: 'Please provide a Terabox link!' });
         }
 
-        // Yahan hum link processing logic jodenge
-        // Abhi ke liye hum ek dummy direct link return kar rahe hain testing ke liye
-        res.json({
-            success: true,
-            downloadUrl: url,
-            fileName: "Terabox_Video.mp4"
-        });
+        // Yahan hum public extraction API ya scraping logic use karenge
+        // Filhal testing ke liye hum check kar rahe hain ki link valid hai ya nahi
+        if (!url.includes('terabox') && !url.includes('1024tera')) {
+            return res.status(400).json({ success: false, error: 'Invalid Terabox link!' });
+        }
+
+        // Note: Terabox links ko direct stream me badalne ke liye hum free public parser APIs ka use kar sakte hain
+        // Yahan hum ek reliable public endpoint integrate kar rahe hain
+        const apiResponse = `https://terabox-dl.qtcloud.workers.dev/api/get-info?url=${encodeURIComponent(url)}`;
+        
+        const response = await axios.get(apiResponse);
+        
+        if (response.data && response.data.direct_link) {
+            res.json({
+                success: true,
+                fileName: response.data.file_name || "Terabox_Video.mp4",
+                downloadUrl: response.data.direct_link
+            });
+        } else {
+            // Fallback agar direct API response na aaye
+            res.json({
+                success: false,
+                error: 'Could not extract direct link. Try another link.'
+            });
+        }
 
     } catch (error) {
-        res.status(500).json({ error: 'Internal Server Error' });
+        console.error(error);
+        res.status(500).json({ success: false, error: 'Internal Server Error during extraction' });
     }
 });
 
