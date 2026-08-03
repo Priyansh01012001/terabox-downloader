@@ -19,8 +19,17 @@ app.post('/api/extract', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Link paste karo bhai!' });
         }
 
-        // Public reliable Terabox extractor proxy API
+        // Teri bilkul correct ki hui cookies aur headers yahan set hain
+        const cookieString = "ndus=YVOf2LVpeHuiTMati6UbujR3LJg821yBfes9B0ly; browserid=FC7WNxpU5oKPLaTFHiWcLAtSxujvwsU1Q0rvLIW4fZSu7W83eUCO6qBZiZY=; csrfToken=ODkMtlKj_BGuE6KzW_6ho8FZ";
+        const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36";
+
+        // Terabox link extractor API request with custom authenticated headers
         const apiResponse = await axios.get(`https://terabox-dl-api.oto.workers.dev/?url=${encodeURIComponent(url)}`, {
+            headers: {
+                'Cookie': cookieString,
+                'User-Agent': userAgent,
+                'Referer': 'https://www.terabox.com/'
+            },
             timeout: 10000
         });
 
