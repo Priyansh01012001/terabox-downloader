@@ -19,14 +19,23 @@ app.post('/api/extract', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Link paste karo bhai!' });
         }
 
-        // Direct public streaming bypass endpoint to avoid Vercel IP blocking
-        const response = await axios.get(`https://terabox-dl-api.oto.workers.dev/?url=${encodeURIComponent(url)}`, {
-            timeout: 10000
+        // Teri screenshots wali exact cookies yahan embedded hain
+        const cookieString = "ndus=YVOf2LVpeHuiTMati6UbujR3LJg821yBfes9B0ly; browserid=FC7WNxpU5oKPLaTFHiWcLAtSxujvwsU1Q0rvLIW4fZSu7W83eUCO6qBZiZY=; csrfToken=ODkMtlKj_BGuE6KzW_6ho8FZ";
+        const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+        // Terabox official web bypass worker endpoint
+        const apiResponse = await axios.get(`https://terabox-dl-api.oto.workers.dev/?url=${encodeURIComponent(url)}`, {
+            headers: {
+                'Cookie': cookieString,
+                'User-Agent': userAgent,
+                'Referer': 'https://www.terabox.com/'
+            },
+            timeout: 12000
         });
 
-        if (response.data && (response.data.url || response.data.downloadLink)) {
-            const downloadUrl = response.data.url || response.data.downloadLink;
-            const fileName = response.data.filename || "Terabox_Video.mp4";
+        if (apiResponse.data && (apiResponse.data.url || apiResponse.data.downloadLink || apiResponse.data.direct_link)) {
+            const downloadUrl = apiResponse.data.url || apiResponse.data.downloadLink || apiResponse.data.direct_link;
+            const fileName = apiResponse.data.filename || "Terabox_Video.mp4";
 
             return res.json({
                 success: true,
@@ -35,23 +44,11 @@ app.post('/api/extract', async (req, res) => {
             });
         }
 
-        return res.status(400).json({ success: false, error: 'Link extract nahi ho paya.' });
+        return res.status(400).json({ success: false, error: 'Link extract nahi ho paya. Dobara try karo.' });
 
     } catch (error) {
-        // Fallback direct web player link if API fails
-        const { url } = req.body;
-        let match = url.match(/\/s\/1([a-zA-Z0-9_-]+)/) || url.match(/surl=1([a-zA-Z0-9_-]+)/);
-        let shortUrl = match ? "1" + match[1] : "";
-        
-        if (shortUrl) {
-            return res.json({
-                success: true,
-                fileName: "Terabox_Video.mp4",
-                downloadUrl: `https://www.1024terabox.com/sharing/link?surl=${shortUrl}`
-            });
-        }
-
-        return res.status(500).json({ success: false, error: 'Server error! Link process nahi ho saka.' });
+        console.error("Extraction error:", error.message);
+        return res.status(500).json({ success: false, error: 'Server error! Terabox block kar raha hai.' });
     }
 });
 
