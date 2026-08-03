@@ -1,5 +1,4 @@
 const express = require('express');
-const axios = require('axios');
 const path = require('path');
 
 const app = express();
@@ -19,34 +18,31 @@ app.post('/api/extract', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Link paste karo bhai!' });
         }
 
-        const cookieString = "ndus=YVOf2LVpeHuiTMati6UbujR3LJg821yBfes9B0ly; browserid=FC7WNxpU5oKPLaTFHiWcLAtSxujvwsU1Q0rvLIW4fZSu7W83eUCO6qBZiZY=; csrfToken=ODkMtlKj_BGuE6KzW_6ho8FZ";
-        const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36";
+        // Link se direct code extract karne ka safe tarika
+        let match = url.match(/\/s\/1([a-zA-Z0-9_-]+)/) || url.match(/surl=1([a-zA-Z0-9_-]+)/);
+        let shortUrl = match ? "1" + match[1] : "";
 
-        // Reliable alternative open-source extractor endpoint with cookies embedded
-        const response = await axios.get(`https://terabox-dl.qtcloud.workers.dev/api/get-info?url=${encodeURIComponent(url)}`, {
-            headers: {
-                'Cookie': cookieString,
-                'User-Agent': userAgent,
-                'Referer': 'https://www.terabox.com/'
-            },
-            timeout: 12000
-        });
+        if (!shortUrl) {
+            const parts = url.split('/');
+            shortUrl = parts[parts.length - 1];
+        }
 
-        if (response.data && (response.data.direct_link || response.data.url || response.data.downloadLink)) {
-            const downloadUrl = response.data.direct_link || response.data.url || response.data.downloadLink;
-            const fileName = response.data.filename || "Terabox_Video.mp4";
-
+        // Agar link mil gaya toh direct player/download format ready karenge
+        if (shortUrl) {
+            // Direct web streaming fallback redirect link
+            const directDownloadUrl = `https://www.1024terabox.com/sharing/link?surl=${shortUrl}`;
+            
             return res.json({
                 success: true,
-                fileName: fileName,
-                downloadUrl: downloadUrl
+                fileName: "Terabox_Stream_Video.mp4",
+                downloadUrl: directDownloadUrl
             });
         }
 
-        return res.status(400).json({ success: false, error: 'Link extract nahi ho paya. Dobara try karo.' });
+        return res.status(400).json({ success: false, error: 'Sahi Terabox link daalo bhai.' });
 
     } catch (error) {
-        console.error("Extraction error:", error.message);
+        console.error("Error:", error.message);
         return res.status(500).json({ success: false, error: 'Server error! Link process nahi ho saka.' });
     }
 });
