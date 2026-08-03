@@ -1,6 +1,5 @@
 const express = require('express');
 const axios = require('axios');
-const cheerio = require('cheerio');
 const path = require('path');
 
 const app = express();
@@ -20,42 +19,27 @@ app.post('/api/extract', async (req, res) => {
             return res.status(400).json({ success: false, error: 'Link paste karo bhai!' });
         }
 
-        const headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36'
-        };
-
-        const response = await axios.get(url, { headers });
-        const html = response.data;
-        const $ = cheerio.load(html);
-
-        let directStreamUrl = null;
-
-        const scriptTags = $('script').toArray();
-        for (let script of scriptTags) {
-            const scriptContent = $(script).html() || '';
-            const streamMatch = scriptContent.match(/https?:\\?\/\\?\/[^\s"']+\.(mp4|m3u8)[^\s"']*/i) || 
-                                scriptContent.match(/"dlink"\s*:\s*"(.*?)"/i);
-                                
-            if (streamMatch) {
-                directStreamUrl = streamMatch[1] || streamMatch[0];
-                directStreamUrl = directStreamUrl.replace(/\\/g, '');
-                break;
-            }
-        }
-
-        if (!directStreamUrl) {
-            directStreamUrl = url;
-        }
-
-        return res.json({
-            success: true,
-            fileName: "Terabox_Direct_Stream.mp4",
-            downloadUrl: directStreamUrl
+        // Public reliable Terabox extractor proxy API
+        const apiResponse = await axios.get(`https://terabox-dl-api.oto.workers.dev/?url=${encodeURIComponent(url)}`, {
+            timeout: 10000
         });
 
+        if (apiResponse.data && (apiResponse.data.url || apiResponse.data.downloadLink)) {
+            const downloadUrl = apiResponse.data.url || apiResponse.data.downloadLink;
+            const fileName = apiResponse.data.filename || "Terabox_Video.mp4";
+
+            return res.json({
+                success: true,
+                fileName: fileName,
+                downloadUrl: downloadUrl
+            });
+        } else {
+            return res.status(400).json({ success: false, error: 'Link extract nahi ho paya. Doosra link try karo.' });
+        }
+
     } catch (error) {
-        console.error("Extraction error:", error.message);
-        return res.status(500).json({ success: false, error: 'Link process nahi ho paya, doosra link try karo!' });
+        console.error("API error:", error.message);
+        return res.status(500).json({ success: false, error: 'Server error! Link process nahi ho saka.' });
     }
 });
 
