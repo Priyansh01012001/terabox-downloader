@@ -1,3 +1,7 @@
+// index.js - backend (Option A)
+// Kaam: /api/extract => try direct media; if not, check if embed page allows iframe and return embedAllowed flag.
+//        /api/stream  => simple proxy with Range support
+
 const express = require('express');
 const path = require('path');
 const axios = require('axios');
@@ -12,19 +16,17 @@ const pump = promisify(pipeline);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Middlewares
 app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(cors()); // For simplicity allow CORS; restrict in production as needed
+app.use(cors()); // restrict origins in production
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 200 }));
 
-// Serve static index.html when run locally (Vercel will serve static separately)
+// Serve index locally (Vercel will serve statics separately)
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Helpers
 function isValidHttpUrl(s) {
   try {
     const u = new URL(s);
@@ -49,7 +51,7 @@ function makeAbsoluteUrl(base, maybeRelative) {
 async function extractMediaFromEmbed(embedUrl) {
   try {
     const resp = await axios.get(embedUrl, {
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+      headers: { 'User-Agent': 'Mozilla/5.0' },
       timeout: 10000,
       maxRedirects: 5,
       responseType: 'text'
@@ -85,26 +87,59 @@ async function extractMediaFromEmbed(embedUrl) {
   }
 }
 
+// Check if embed page allows being embedded (simple HEAD check)
+async function checkEmbedAllowed(embedPage, allowedOrigin) {
+  try {
+    const head = await axios.head(embedPage, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      timeout: 7000,
+      maxRedirects: 5
+    });
+
+    const xfo = (head.headers['x-frame-options'] || '').toLowerCase();
+    const csp = (head.headers['content-security-policy'] || '').toLowerCase();
+
+    if (xfo.includes('deny') || xfo.includes('sameorigin')) return false;
+    if (csp.includes('frame-ancestors')) {
+      // crude parse: if frame-ancestors present and doesn't include '*', 'self' or our origin, block
+      if (csp.includes('frame-ancestors *')) return true;
+      if (csp.includes('frame-ancestors \'self\'')) {
+        // sameorigin allowed only if same origin; assume blocked for our site
+        return false;
+      }
+      // if configuration present but not open, return false
+      return false;
+    }
+    // default: allow (but note HEAD may not reveal all)
+    return true;
+  } catch (err) {
+    // HEAD failed — safer to assume blocked
+    return false;
+  }
+}
+
 // POST /api/extract
 app.post('/api/extract', async (req, res) => {
   const { url } = req.body || {};
   if (!url) return res.status(400).json({ success: false, error: 'Link paste karo bhai!' });
 
-  // try to normalize short id (common terabox pattern)
+  // Try to find short id
   let match = url.match(/\/s\/1([a-zA-Z0-9_-]+)/) || url.match(/surl=1([a-zA-Z0-9_-]+)/);
   let shortUrl = match ? "1" + match[1] : "";
   if (!shortUrl) {
     const parts = url.split('/');
     shortUrl = parts[parts.length - 1] || '';
   }
-
   const embedPage = shortUrl ? `https://www.1024terabox.com/sharing/embed?surl=${shortUrl}&autoplay=1` : url;
 
-  // Try extract direct media (.mp4/.m3u8)
+  // Try direct media
   let directMedia = null;
   if (isValidHttpUrl(embedPage)) {
     directMedia = await extractMediaFromEmbed(embedPage);
   }
+
+  // Check embed allowed (HEAD)
+  const embedAllowed = await checkEmbedAllowed(embedPage);
 
   if (directMedia) {
     const proxied = `/api/stream?url=${encodeURIComponent(directMedia)}`;
@@ -112,21 +147,23 @@ app.post('/api/extract', async (req, res) => {
       success: true,
       fileName: path.basename(directMedia.split('?')[0]) || 'video.mp4',
       downloadUrl: proxied,
-      isEmbed: false
+      isEmbed: false,
+      embedAllowed: true
     });
   }
 
-  // Fallback to embed page (iframe). Note: embed may require JS or cookies to generate real media.
+  // fallback: embed page
   return res.json({
     success: true,
     fileName: 'Terabox_Stream (embed)',
     downloadUrl: embedPage,
     isEmbed: true,
-    warning: 'Direct media URL not auto-detected. If playback fails, the link may require JS or auth.'
+    embedAllowed: embedAllowed,
+    warning: embedAllowed ? null : 'Embedding blocked — use Open on Terabox button'
   });
 });
 
-// GET /api/stream?url=ENCODED_URL -> proxy stream with Range support
+// GET /api/stream - proxy stream with Range support
 app.get('/api/stream', async (req, res) => {
   const raw = req.query.url;
   if (!raw || !isValidHttpUrl(raw)) return res.status(400).json({ error: 'missing or invalid url' });
@@ -150,7 +187,6 @@ app.get('/api/stream', async (req, res) => {
 
     const upstreamResp = await axios(axiosOpts);
 
-    // forward important headers
     if (upstreamResp.headers['content-type']) res.setHeader('Content-Type', upstreamResp.headers['content-type']);
     if (upstreamResp.headers['content-length']) res.setHeader('Content-Length', upstreamResp.headers['content-length']);
     if (upstreamResp.headers['accept-ranges']) res.setHeader('Accept-Ranges', upstreamResp.headers['accept-ranges']);
@@ -173,11 +209,10 @@ app.get('/api/stream', async (req, res) => {
   }
 });
 
-// Export app (for Vercel). When run directly, start server.
 module.exports = app;
 
 if (require.main === module) {
   app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`Server running on port ${PORT}`);
   });
-          }
+  }
