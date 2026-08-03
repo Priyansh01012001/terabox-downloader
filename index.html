@@ -10,21 +10,21 @@
             background-color: #0f172a;
             color: #ffffff;
             margin: 0;
-            padding: 0;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
         }
         .container {
-            width: 90%;
+            width: 100%;
             max-width: 450px;
             background: #1e293b;
             padding: 25px;
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
             text-align: center;
+            margin-top: 20px;
         }
         h2 {
             color: #38bdf8;
@@ -65,6 +65,27 @@
         button:hover {
             background-color: #1d4ed8;
         }
+        .result-box {
+            margin-top: 20px;
+            display: none;
+            text-align: left;
+        }
+        video {
+            width: 100%;
+            border-radius: 8px;
+            margin-top: 10px;
+        }
+        .download-btn {
+            display: block;
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #16a34a;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            text-align: center;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -74,17 +95,50 @@
         <p>Watch your Terabox links instantly and faster.</p>
         
         <input type="text" id="teraboxUrl" placeholder="Paste your Terabox link here...">
-        <button onclick="playVideo()">▶ Play</button>
+        <button onclick="extractVideo()">▶ Play / Extract</button>
+
+        <div class="result-box" id="resultBox">
+            <h3 id="fileName" style="font-size: 15px; color: #38bdf8;"></h3>
+            <video id="videoPlayer" controls></video>
+            <a id="downloadLink" class="download-btn" target="_blank">📥 Download Video</a>
+        </div>
     </div>
 
     <script>
-        function playVideo() {
+        async function extractVideo() {
             let url = document.getElementById('teraboxUrl').value;
             if(!url) {
                 alert("Pehle Terabox ka link toh daal bhai!");
                 return;
             }
-            alert("Link mil gaya! Ab isko extract karne ka backend code jodenge.");
+
+            let btn = document.querySelector('button');
+            btn.innerText = "Extracting...";
+            btn.disabled = true;
+
+            try {
+                let response = await fetch('/api/extract', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: url })
+                });
+
+                let data = await response.json();
+                
+                if(data.success) {
+                    document.getElementById('fileName').innerText = data.fileName;
+                    document.getElementById('videoPlayer').src = data.downloadUrl;
+                    document.getElementById('downloadLink').href = data.downloadUrl;
+                    document.getElementById('resultBox').style.display = 'block';
+                } else {
+                    alert("Link extract nahi ho paya: " + (data.error || "Unknown error"));
+                }
+            } catch (err) {
+                alert("Server error aagya!");
+            } finally {
+                btn.innerText = "▶ Play / Extract";
+                btn.disabled = false;
+            }
         }
     </script>
 
