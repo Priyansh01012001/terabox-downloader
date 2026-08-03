@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hi">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -18,12 +18,14 @@
     video{width:100%;height:420px;background:#000}
     iframe{width:100%;height:420px;border:none;background:#000}
     .error-msg{color:#f87171;margin-top:12px;font-size:14px}
+    .btn-row{display:flex;gap:10px;justify-content:center;margin-top:10px}
+    .secondary{background:#0f1724;color:#cbd5e1;padding:10px;border-radius:8px;border:1px solid #334155}
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Quick Player Instant Streaming</h1>
-    <p>Paste Terabox share link and play inside this page.</p>
+    <p>Terabox share link paste karo aur play karo.</p>
 
     <div class="input-group">
       <input type="text" id="urlInput" placeholder="Paste Terabox link here (e.g., https://1024terabox.com/s/...)">
@@ -34,9 +36,14 @@
     <div id="fileName"></div>
 
     <div class="player-box" id="playerBox">
-      <!-- Use video for direct media. Use iframe for embed fallback. -->
       <video id="player" controls crossorigin="anonymous" style="display:none"></video>
       <iframe id="playerIframe" style="display:none" allowfullscreen></iframe>
+      <div id="fallbackUI" style="display:none;margin-top:8px;text-align:center">
+        <div id="fallbackText" style="color:#94a3b8"></div>
+        <div class="btn-row">
+          <button id="openTeraboxBtn" class="secondary">Open on Terabox (New tab)</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -48,6 +55,9 @@
       const playerBox = document.getElementById('playerBox');
       const player = document.getElementById('player');
       const playerIframe = document.getElementById('playerIframe');
+      const fallbackUI = document.getElementById('fallbackUI');
+      const fallbackText = document.getElementById('fallbackText');
+      const openTeraboxBtn = document.getElementById('openTeraboxBtn');
       const btn = document.getElementById('extractBtn');
 
       errorBox.innerText = '';
@@ -55,6 +65,7 @@
       playerBox.style.display = 'none';
       player.style.display = 'none';
       playerIframe.style.display = 'none';
+      fallbackUI.style.display = 'none';
       player.removeAttribute('src');
       playerIframe.removeAttribute('src');
 
@@ -82,16 +93,27 @@
           playerBox.style.display = 'block';
 
           if (data.isEmbed) {
-            // embed fallback: show iframe
-            playerIframe.src = data.downloadUrl;
-            playerIframe.style.display = 'block';
-            player.style.display = 'none';
+            // embed fallback path
+            if (data.embedAllowed) {
+              // safe to embed iframe
+              playerIframe.src = data.downloadUrl;
+              playerIframe.style.display = 'block';
+              player.style.display = 'none';
+            } else {
+              // embedding blocked — show fallback UI
+              fallbackText.innerText = 'Terabox embedding blocked. Aap video Terabox par khol sakte hain.';
+              fallbackUI.style.display = 'block';
+              openTeraboxBtn.onclick = () => window.open(data.downloadUrl, '_blank');
+              player.style.display = 'none';
+              playerIframe.style.display = 'none';
+            }
           } else {
-            // direct media: use proxied stream (this supports Range/CORS)
+            // direct media path: use proxied stream
             player.src = data.downloadUrl;
             player.style.display = 'block';
             playerIframe.style.display = 'none';
-            // try autoplay (may be blocked by browser), user can press play
+            fallbackUI.style.display = 'none';
+            // try autoplay (may be blocked)
             player.play().catch(()=>{});
           }
         } else {
