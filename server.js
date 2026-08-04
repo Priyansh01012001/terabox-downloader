@@ -20,7 +20,8 @@ const PORT = process.env.PORT || 3000;
 const CACHE_TTL_MS = Number(process.env.CACHE_TTL_MS || 5 * 60 * 1000); // 5 min
 const MAX_PUPPETEER_CONCURRENCY = Number(process.env.MAX_PUPPETEER_CONCURRENCY || 2);
 
-app.use(helmet());
+// Helmet configured to disable Content Security Policy so inline scripts work properly
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
@@ -129,7 +130,6 @@ async function extractMediaWithPuppeteer(embedUrl, timeoutMs = 20000) {
 
     await page.goto(embedUrl, { waitUntil: 'networkidle2', timeout: timeoutMs }).catch(()=>{});
     
-    // Fixed deprecated waitForTimeout issue safely
     await new Promise(resolve => setTimeout(resolve, 2500));
 
     if (!found) {
