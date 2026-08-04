@@ -1,6 +1,5 @@
 FROM node:20-bullseye-slim
 
-# Install necessary libraries for Puppeteer/Chromium
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     fonts-liberation \
@@ -29,7 +28,7 @@ RUN apt-get update && apt-get install -y \
     libxcomposite1 \
     libxcursor1 \
     libxdamage1 \
-    libext6 \
+    libxext6 \
     libxfixes3 \
     libxi6 \
     libxrandr2 \
