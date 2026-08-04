@@ -20,7 +20,10 @@
     <h2>Terabox Quick Player</h2>
     <p class="info">Link paste karo — agar possible hua to yahin stream chalega, warna "Open on Terabox" dikhayenge.</p>
     <input id="link" placeholder="https://1024terabox.com/s/..." />
-    <div style="display:flex;gap:8px"><button onclick="doExtract()">Play</button><button onclick="copyLink()">Copy Link</button></div>
+    <div style="display:flex;gap:8px">
+      <button id="playBtn">Play</button>
+      <button id="copyBtn">Copy Link</button>
+    </div>
     <div id="meta" class="info"></div>
 
     <div class="player" id="playerWrap" style="display:none">
@@ -29,7 +32,7 @@
       <div id="fallback" class="fallback" style="display:none">
         <div id="fallbackText" style="color:#94a3b8"></div>
         <div style="margin-top:8px">
-          <button onclick="openTerabox()">Open on Terabox (new tab)</button>
+          <button id="openTeraboxBtn">Open on Terabox (new tab)</button>
         </div>
       </div>
     </div>
@@ -37,7 +40,20 @@
 
   <script>
     let lastDownloadUrl = null;
-    function copyLink(){ const v = document.getElementById('link').value.trim(); if(!v) return alert('Link paste karo'); navigator.clipboard.writeText(v).then(()=>alert('Copied')) }
+
+    document.getElementById('copyBtn').addEventListener('click', () => {
+      const v = document.getElementById('link').value.trim();
+      if(!v) return alert('Link paste karo');
+      navigator.clipboard.writeText(v).then(() => alert('Copied'));
+    });
+
+    document.getElementById('playBtn').addEventListener('click', doExtract);
+
+    document.getElementById('openTeraboxBtn').addEventListener('click', () => {
+      if(!lastDownloadUrl) return alert('No link');
+      window.open(lastDownloadUrl, '_blank');
+    });
+
     async function doExtract(){
       const url = document.getElementById('link').value.trim();
       if(!url) return alert('Link paste karo');
@@ -55,7 +71,6 @@
         document.getElementById('playerWrap').style.display = 'block';
         if(data.isEmbed){
           if(data.embedAllowed){
-            // show iframe
             document.getElementById('iframe').src = data.downloadUrl;
             document.getElementById('iframe').style.display = 'block';
             document.getElementById('player').style.display = 'none';
@@ -69,13 +84,11 @@
             lastDownloadUrl = data.downloadUrl;
           }
         } else {
-          // direct media via proxied endpoint
           document.getElementById('player').src = data.downloadUrl;
           document.getElementById('player').style.display = 'block';
           document.getElementById('iframe').style.display = 'none';
           document.getElementById('fallback').style.display = 'none';
           lastDownloadUrl = data.downloadUrl;
-          // try autoplay (may be blocked)
           document.getElementById('player').play().catch(()=>{});
         }
       } catch (err) {
@@ -83,7 +96,6 @@
         document.getElementById('meta').innerText = 'Server error';
       }
     }
-    function openTerabox(){ if(!lastDownloadUrl) return alert('No link'); window.open(lastDownloadUrl, '_blank'); }
   </script>
 </body>
 </html>
