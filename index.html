@@ -3,130 +3,87 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Quick Player Instant Streaming</title>
+  <title>Terabox Quick Player</title>
   <style>
-    *{box-sizing:border-box;margin:0;padding:0;font-family:Segoe UI, Tahoma, Geneva, Verdana, sans-serif}
-    body{background:#0b1120;color:#fff;display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:20px}
-    .container{width:100%;max-width:720px;margin-top:40px;text-align:center}
-    h1{color:#38bdf8;font-size:26px;margin-bottom:8px}
-    p{color:#94a3b8;font-size:14px;margin-bottom:18px}
-    .input-group{display:flex;flex-direction:column;gap:12px}
-    input[type="text"]{padding:14px;background:#1e293b;border:1px solid #334155;border-radius:8px;color:#fff;width:100%}
-    button{padding:14px;background:#2563eb;color:#fff;border-radius:8px;border:none;cursor:pointer}
-    #fileName{color:#38bdf8;margin:12px 0;word-break:break-all}
-    .player-box{background:#000;border-radius:10px;overflow:hidden;border:1px solid #334155;margin-top:12px;display:none;padding:12px}
-    video{width:100%;height:420px;background:#000}
-    iframe{width:100%;height:420px;border:none;background:#000}
-    .error-msg{color:#f87171;margin-top:12px;font-size:14px}
-    .btn-row{display:flex;gap:10px;justify-content:center;margin-top:10px}
-    .secondary{background:#0f1724;color:#cbd5e1;padding:10px;border-radius:8px;border:1px solid #334155}
+    body{background:#0b1120;color:#fff;font-family:Segoe UI,Arial;margin:0;padding:20px;display:flex;flex-direction:column;align-items:center}
+    .container{width:100%;max-width:720px}
+    input{width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#0f1724;color:#fff;margin-bottom:10px}
+    button{padding:12px 16px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer}
+    .info{color:#94a3b8;margin-top:8px}
+    .player{margin-top:12px;background:#000;border-radius:8px;padding:12px;border:1px solid #202632}
+    video, iframe{width:100%;height:420px;background:#000;border:0}
+    .fallback{margin-top:10px}
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Quick Player Instant Streaming</h1>
-    <p>Terabox share link paste karo aur play karo.</p>
+    <h2>Terabox Quick Player</h2>
+    <p class="info">Link paste karo — agar possible hua to yahin stream chalega, warna "Open on Terabox" dikhayenge.</p>
+    <input id="link" placeholder="https://1024terabox.com/s/..." />
+    <div style="display:flex;gap:8px"><button onclick="doExtract()">Play</button><button onclick="copyLink()">Copy Link</button></div>
+    <div id="meta" class="info"></div>
 
-    <div class="input-group">
-      <input type="text" id="urlInput" placeholder="Paste Terabox link here (e.g., https://1024terabox.com/s/...)">
-      <button id="extractBtn" onclick="extractVideo()">▶ Play Video</button>
-    </div>
-
-    <div id="errorBox" class="error-msg"></div>
-    <div id="fileName"></div>
-
-    <div class="player-box" id="playerBox">
-      <video id="player" controls crossorigin="anonymous" style="display:none"></video>
-      <iframe id="playerIframe" style="display:none" allowfullscreen></iframe>
-      <div id="fallbackUI" style="display:none;margin-top:8px;text-align:center">
+    <div class="player" id="playerWrap" style="display:none">
+      <video id="player" controls style="display:none"></video>
+      <iframe id="iframe" style="display:none"></iframe>
+      <div id="fallback" class="fallback" style="display:none">
         <div id="fallbackText" style="color:#94a3b8"></div>
-        <div class="btn-row">
-          <button id="openTeraboxBtn" class="secondary">Open on Terabox (New tab)</button>
+        <div style="margin-top:8px">
+          <button onclick="openTerabox()">Open on Terabox (new tab)</button>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    async function extractVideo() {
-      const url = document.getElementById('urlInput').value.trim();
-      const errorBox = document.getElementById('errorBox');
-      const fileNameDiv = document.getElementById('fileName');
-      const playerBox = document.getElementById('playerBox');
-      const player = document.getElementById('player');
-      const playerIframe = document.getElementById('playerIframe');
-      const fallbackUI = document.getElementById('fallbackUI');
-      const fallbackText = document.getElementById('fallbackText');
-      const openTeraboxBtn = document.getElementById('openTeraboxBtn');
-      const btn = document.getElementById('extractBtn');
-
-      errorBox.innerText = '';
-      fileNameDiv.innerText = '';
-      playerBox.style.display = 'none';
-      player.style.display = 'none';
-      playerIframe.style.display = 'none';
-      fallbackUI.style.display = 'none';
-      player.removeAttribute('src');
-      playerIframe.removeAttribute('src');
-
-      if (!url) {
-        errorBox.innerText = 'Pehle Terabox ka link paste karo bhai!';
-        return;
-      }
-
-      btn.innerText = 'Processing...';
-      btn.disabled = true;
-
+    let lastDownloadUrl = null;
+    function copyLink(){ const v = document.getElementById('link').value.trim(); if(!v) return alert('Link paste karo'); navigator.clipboard.writeText(v).then(()=>alert('Copied')) }
+    async function doExtract(){
+      const url = document.getElementById('link').value.trim();
+      if(!url) return alert('Link paste karo');
+      document.getElementById('meta').innerText = 'Processing...';
+      document.getElementById('playerWrap').style.display = 'none';
       try {
         const resp = await fetch('/api/extract', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ url })
         });
-
         const data = await resp.json();
-
-        if (!resp.ok) {
-          errorBox.innerText = data.error || 'Kuch gadbad ho gayi!';
-        } else if (data.success) {
-          fileNameDiv.innerText = data.fileName || 'Video';
-          playerBox.style.display = 'block';
-
-          if (data.isEmbed) {
-            // embed fallback path
-            if (data.embedAllowed) {
-              // safe to embed iframe
-              playerIframe.src = data.downloadUrl;
-              playerIframe.style.display = 'block';
-              player.style.display = 'none';
-            } else {
-              // embedding blocked — show fallback UI
-              fallbackText.innerText = 'Terabox embedding blocked. Aap video Terabox par khol sakte hain.';
-              fallbackUI.style.display = 'block';
-              openTeraboxBtn.onclick = () => window.open(data.downloadUrl, '_blank');
-              player.style.display = 'none';
-              playerIframe.style.display = 'none';
-            }
+        if(!resp.ok){ document.getElementById('meta').innerText = data.error || 'Error'; return; }
+        document.getElementById('meta').innerText = `Filename: ${data.fileName || 'N/A'} ${data.sizeText ? '- ' + data.sizeText : ''}`;
+        document.getElementById('playerWrap').style.display = 'block';
+        if(data.isEmbed){
+          if(data.embedAllowed){
+            // show iframe
+            document.getElementById('iframe').src = data.downloadUrl;
+            document.getElementById('iframe').style.display = 'block';
+            document.getElementById('player').style.display = 'none';
+            document.getElementById('fallback').style.display = 'none';
+            lastDownloadUrl = data.downloadUrl;
           } else {
-            // direct media path: use proxied stream
-            player.src = data.downloadUrl;
-            player.style.display = 'block';
-            playerIframe.style.display = 'none';
-            fallbackUI.style.display = 'none';
-            // try autoplay (may be blocked)
-            player.play().catch(()=>{});
+            document.getElementById('iframe').style.display = 'none';
+            document.getElementById('player').style.display = 'none';
+            document.getElementById('fallbackText').innerText = data.warning || 'Embedding blocked. Open on Terabox.';
+            document.getElementById('fallback').style.display = 'block';
+            lastDownloadUrl = data.downloadUrl;
           }
         } else {
-          errorBox.innerText = data.error || 'Kuch gadbad ho gayi!';
+          // direct media via proxied endpoint
+          document.getElementById('player').src = data.downloadUrl;
+          document.getElementById('player').style.display = 'block';
+          document.getElementById('iframe').style.display = 'none';
+          document.getElementById('fallback').style.display = 'none';
+          lastDownloadUrl = data.downloadUrl;
+          // try autoplay (may be blocked)
+          document.getElementById('player').play().catch(()=>{});
         }
       } catch (err) {
         console.error(err);
-        errorBox.innerText = 'Server error! Dobara try karo.';
-      } finally {
-        btn.innerText = '▶ Play Video';
-        btn.disabled = false;
+        document.getElementById('meta').innerText = 'Server error';
       }
     }
+    function openTerabox(){ if(!lastDownloadUrl) return alert('No link'); window.open(lastDownloadUrl, '_blank'); }
   </script>
 </body>
 </html>
